@@ -14,7 +14,7 @@
 #include "xl9535.h"
 #include <stdio.h>
 
-#include "demos/lv_demos.h"
+
 
 
 
@@ -533,30 +533,30 @@ static void tft_init(void) {
   }
 }
 
-lv_obj_t *ui_Screen1;
-lv_obj_t *ui_Image2;
+// lv_obj_t *ui_Screen1;
+// lv_obj_t *ui_Image2;
 
-static void Pallete_screen_init(void) {
-  ui_Screen1 = lv_obj_create(NULL);
-  lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+// static void Pallete_screen_init(void) {
+//   ui_Screen1 = lv_obj_create(NULL);
+//   lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-  ui_Image2 = lv_img_create(ui_Screen1);
-  lv_img_set_src(ui_Image2, &ui_img_round_pallette_png);
-  lv_obj_set_width(ui_Image2, LV_SIZE_CONTENT);  /// 1
-  lv_obj_set_height(ui_Image2, LV_SIZE_CONTENT); /// 1
-  lv_obj_set_align(ui_Image2, LV_ALIGN_CENTER);
-  lv_obj_add_flag(ui_Image2, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
-  lv_obj_clear_flag(ui_Image2, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-}
+//   ui_Image2 = lv_img_create(ui_Screen1);
+//   lv_img_set_src(ui_Image2, &ui_img_round_pallette_png);
+//   lv_obj_set_width(ui_Image2, LV_SIZE_CONTENT);  /// 1
+//   lv_obj_set_height(ui_Image2, LV_SIZE_CONTENT); /// 1
+//   lv_obj_set_align(ui_Image2, LV_ALIGN_CENTER);
+//   lv_obj_add_flag(ui_Image2, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
+//   lv_obj_clear_flag(ui_Image2, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+// }
 
-static void Pallete_init() {
-  lv_disp_t *dispp = lv_disp_get_default();
-  lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
-                                            false, LV_FONT_DEFAULT);
-  lv_disp_set_theme(dispp, theme);
-  Pallete_screen_init();
-  lv_disp_load_scr(ui_Screen1);
-}
+// static void Pallete_init() {
+//   lv_disp_t *dispp = lv_disp_get_default();
+//   lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
+//                                             false, LV_FONT_DEFAULT);
+//   lv_disp_set_theme(dispp, theme);
+//   Pallete_screen_init();
+//   lv_disp_load_scr(ui_Screen1);
+// }
 
 
 // static void get_img_color(uint16_t x, uint16_t y){
