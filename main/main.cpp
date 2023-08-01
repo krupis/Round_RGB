@@ -14,17 +14,6 @@
 #include "xl9535.h"
 #include <stdio.h>
 
-
-
-
-
-
-// LV_IMG_DECLARE(ui_img_round_pallette_png)
-
-// static void Pallete_screen_init(void);
-// static void Pallete_init();
-static void get_img_color(uint16_t x, uint16_t y);
-
 static const char *TAG = "T-RGB example";
 
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 2
@@ -180,44 +169,35 @@ static int writeRegister(uint8_t devAddr, uint16_t regAddr, uint8_t *data, uint8
   return 0;
 }
 
-static void lv_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
+// static void lv_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 
-  if (touch.read()) {
-    printf("touch detected \n");
-    TP_Point t = touch.getPoint(0);
-    data->point.x = t.x;
-    data->point.y = t.y;
-    //get_img_color(t.x,t.y);
-    data->state = LV_INDEV_STATE_PR;
-  } else {
-    data->state = LV_INDEV_STATE_REL;
-  }
-}
+//   if (touch.read()) {
+//     printf("touch detected \n");
+//     TP_Point t = touch.getPoint(0);
+//     data->point.x = t.x;
+//     data->point.y = t.y;
+//     //get_img_color(t.x,t.y);
+//     data->state = LV_INDEV_STATE_PR;
+//   } else {
+//     data->state = LV_INDEV_STATE_REL;
+//   }
+// }
 
 static bool example_on_vsync_event(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *event_data,
                                    void *user_data) {
   BaseType_t high_task_awoken = pdFALSE;
-#if CONFIG_EXAMPLE_AVOID_TEAR_EFFECT_WITH_SEM
-  if (xSemaphoreTakeFromISR(sem_gui_ready, &high_task_awoken) == pdTRUE) {
-    xSemaphoreGiveFromISR(sem_vsync_end, &high_task_awoken);
-  }
-#endif
   return high_task_awoken == pdTRUE;
 }
 
-static void example_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map) {
-  esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)drv->user_data;
-  int offsetx1 = area->x1;
-  int offsetx2 = area->x2;
-  int offsety1 = area->y1;
-  int offsety2 = area->y2;
-#if CONFIG_EXAMPLE_AVOID_TEAR_EFFECT_WITH_SEM
-  xSemaphoreGive(sem_gui_ready);
-  xSemaphoreTake(sem_vsync_end, portMAX_DELAY);
-#endif
-  // pass the draw buffer to the driver
-  esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
-  lv_disp_flush_ready(drv);
+static void disp_flush(lv_disp_t *disp_drv, const lv_area_t *area, lv_color_t *px_map) {
+  printf("display flush \n");
+  LV_UNUSED(area);
+  LV_UNUSED(px_map);
+
+  /*IMPORTANT!!!
+   *Inform the graphics library that you are ready with the flushing*/
+
+  lv_disp_flush_ready(disp_drv);
 }
 
 static void example_increase_lvgl_tick(void *arg) {
@@ -226,16 +206,6 @@ static void example_increase_lvgl_tick(void *arg) {
 }
 
 extern "C" void app_main(void) {
-  static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer(s) called draw buffer(s)
-  static lv_disp_drv_t disp_drv;      // contains callback functions
-  static lv_indev_drv_t indev_drv;
-#if CONFIG_EXAMPLE_AVOID_TEAR_EFFECT_WITH_SEM
-  ESP_LOGI(TAG, "Create semaphores");
-  sem_vsync_end = xSemaphoreCreateBinary();
-  assert(sem_vsync_end);
-  sem_gui_ready = xSemaphoreCreateBinary();
-  assert(sem_gui_ready);
-#endif
 
   i2c_config_t conf = {
       .mode = I2C_MODE_MASTER,
@@ -245,7 +215,7 @@ extern "C" void app_main(void) {
       .scl_pullup_en = GPIO_PULLUP_ENABLE,
       .master =
           {
-              .clk_speed = 400 * 1000,
+              .clk_speed = 100 * 1000,
           },
   };
   esp_err_t err = i2c_param_config(I2C_MASTER_PORT, &conf);
@@ -338,9 +308,7 @@ extern "C" void app_main(void) {
     .flags =
         {
             .fb_in_psram = true, // allocate frame buffer in PSRAM
-#if CONFIG_EXAMPLE_DOUBLE_FB
-            .double_fb = true, // allocate double frame buffer
-#endif                         // CONFIG_EXAMPLE_DOUBLE_FB
+
         },
   };
   ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&panel_config, &panel_handle));
@@ -349,7 +317,8 @@ extern "C" void app_main(void) {
   esp_lcd_rgb_panel_event_callbacks_t cbs = {
       .on_vsync = example_on_vsync_event,
   };
-  ESP_ERROR_CHECK(esp_lcd_rgb_panel_register_event_callbacks(panel_handle, &cbs, &disp_drv));
+
+  // ESP_ERROR_CHECK(esp_lcd_rgb_panel_register_event_callbacks(panel_handle, &cbs, &disp_drv));
 
   ESP_LOGI(TAG, "Initialize RGB LCD panel");
   ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
@@ -362,106 +331,40 @@ extern "C" void app_main(void) {
 
   ESP_LOGI(TAG, "Initialize LVGL library");
   lv_init();
+  lv_disp_t *disp = lv_disp_create(EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES);
+  lv_disp_set_flush_cb(disp, (lv_disp_flush_cb_t)(disp_flush));
+  // static lv_color_t buf_2_1[EXAMPLE_LCD_H_RES * 10];
+  // static lv_color_t buf_2_2[EXAMPLE_LCD_H_RES * 10];
+  // lv_disp_set_draw_buffers(disp, buf_2_1, buf_2_2, sizeof(buf_2_1), LV_DISP_RENDER_MODE_PARTIAL);
+
+  // static lv_color_t buf_3_1[EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES];
+  // static lv_color_t buf_3_2[EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES];
   void *buf1 = NULL;
   void *buf2 = NULL;
-#if CONFIG_EXAMPLE_DOUBLE_FB
-  ESP_LOGI(TAG, "Use frame buffers as LVGL draw buffers");
-  ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, &buf1, &buf2));
-  // initialize LVGL draw buffers
-  lv_disp_draw_buf_init(&disp_buf, buf1, buf2, EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES);
-#else
-  ESP_LOGI(TAG, "Allocate separate LVGL draw buffers from PSRAM");
-  buf1 = heap_caps_malloc(EXAMPLE_LCD_H_RES * 100 * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+  buf1 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
   assert(buf1);
-  buf2 = heap_caps_malloc(EXAMPLE_LCD_H_RES * 100 * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+  buf2 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
   assert(buf2);
-  // initialize LVGL draw buffers
-  lv_disp_draw_buf_init(&disp_buf, buf1, buf2, EXAMPLE_LCD_H_RES * 100);
-#endif // CONFIG_EXAMPLE_DOUBLE_FB
-
-  ESP_LOGI(TAG, "Register display driver to LVGL");
-  lv_disp_drv_init(&disp_drv);
-  disp_drv.hor_res = EXAMPLE_LCD_H_RES;
-  disp_drv.ver_res = EXAMPLE_LCD_V_RES;
-  disp_drv.flush_cb = example_lvgl_flush_cb;
-  disp_drv.draw_buf = &disp_buf;
-  disp_drv.user_data = panel_handle;
-#if CONFIG_EXAMPLE_DOUBLE_FB
-  disp_drv.full_refresh = true; // the full_refresh mode can maintain the synchronization between the two frame buffers
-#endif
-  lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
-
-  ESP_LOGI(TAG, "Register touch driver to LVGL");
-  lv_indev_drv_init(&indev_drv);
-  indev_drv.type = LV_INDEV_TYPE_POINTER;
-  indev_drv.read_cb = lv_touchpad_read;
-  lv_indev_drv_register(&indev_drv);
+  lv_disp_set_draw_buffers(disp, buf1, buf2, sizeof(buf1), LV_DISP_RENDER_MODE_DIRECT);
 
   ESP_LOGI(TAG, "Install LVGL tick timer");
-  // Tick interface for LVGL (using esp_timer to generate 2ms periodic event)
   const esp_timer_create_args_t lvgl_tick_timer_args = {.callback = &example_increase_lvgl_tick, .name = "lvgl_tick"};
   esp_timer_handle_t lvgl_tick_timer = NULL;
   ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
   ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000));
 
-// #if LV_USE_DEMO_WIDGETS
-//   ESP_LOGI(TAG, "Display LVGL Demos");
-//   lv_demo_widgets();
-// #elif LV_USE_DEMO_BENCHMARK
-//   ESP_LOGI(TAG, "Display LVGL Demos benchmark");
-//   lv_demo_benchmark();
-// #elif LV_USE_DEMO_STRESS
-//   ESP_LOGI(TAG, "Display LVGL Demos stress");
-//   lv_demo_stress();
-// #elif LV_USE_DEMO_KEYPAD_AND_ENCODER
-//   ESP_LOGI(TAG, "Display LVGL Demos keypad encoder");
-//   lv_demo_keypad_encoder();
-// #elif LV_USE_DEMO_MUSIC
-//   ESP_LOGI(TAG, "Display LVGL Demos music");
-//   lv_demo_music();
-// #elif LV_USE_GIF
-//   LV_IMG_DECLARE(rock_gif);
-//   ESP_LOGI(TAG, "Test decoding gif pictures. Pay attention to turn on LVGL GIF support.");
-//   lv_obj_t *img = lv_gif_create(lv_scr_act());
-//   lv_gif_set_src(img, &rock_gif);
-//   lv_obj_center(img);
-// #else
-//   LV_IMG_DECLARE(logo);
-//   ESP_LOGI(TAG, "Test decoding pictures.");
-//   lv_obj_t *img = lv_img_create(lv_scr_act());
-//   lv_img_set_src(img, &logo);
-//   lv_obj_center(img);
-// #endif
-
-  // LV_IMG_DECLARE(logo);
-  // ESP_LOGI(TAG, "Test decoding pictures.");
-  // lv_obj_t *img = lv_img_create(lv_scr_act());
-  // lv_img_set_src(img, &logo);
-  // lv_obj_center(img);
-
-  //  ESP_LOGI(TAG, "Display LVGL Demos stress");
-  //  lv_demo_stress();
-
-
-
-  // lv_obj_t* img = lv_img_create(lv_scr_act());
-  // lv_img_set_src(img, &ui_img_round_pallette_png);
-  // lv_obj_center(img);
+  lv_obj_t *win = lv_win_create(lv_scr_act(), 40);
+  assert(win);
+  lv_win_add_title(win, "test123!");
 
   while (1) {
-    // raise the task priority of LVGL and/or reduce the handler period can improve the performance
-    vTaskDelay(pdMS_TO_TICKS(2));
-    // The task running lv_timer_handler should have lower priority than that running `lv_tick_inc`
-    lv_timer_handler();
-
-    // if (touch.read()) {
-    //   uint8_t n = touch.getPointNum();
-    //   printf("getPointNum: %d  \r\n", n);
-    //   for (uint8_t i = 0; i < n; i++) {
-    //     TP_Point t = touch.getPoint(i);
-    //     printf("[%d] point x: %d  point y: %d \r\n", i, t.x, t.y);
-    //   }
-    // }
+    uint32_t task_delay_ms = lv_timer_handler();
+    if (task_delay_ms > 500) {
+      task_delay_ms = 500;
+    } else if (task_delay_ms < 5) {
+      task_delay_ms = 5;
+    }
+    vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
   }
 }
 
@@ -532,35 +435,3 @@ static void tft_init(void) {
     cmd++;
   }
 }
-
-// lv_obj_t *ui_Screen1;
-// lv_obj_t *ui_Image2;
-
-// static void Pallete_screen_init(void) {
-//   ui_Screen1 = lv_obj_create(NULL);
-//   lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-//   ui_Image2 = lv_img_create(ui_Screen1);
-//   lv_img_set_src(ui_Image2, &ui_img_round_pallette_png);
-//   lv_obj_set_width(ui_Image2, LV_SIZE_CONTENT);  /// 1
-//   lv_obj_set_height(ui_Image2, LV_SIZE_CONTENT); /// 1
-//   lv_obj_set_align(ui_Image2, LV_ALIGN_CENTER);
-//   lv_obj_add_flag(ui_Image2, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
-//   lv_obj_clear_flag(ui_Image2, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-// }
-
-// static void Pallete_init() {
-//   lv_disp_t *dispp = lv_disp_get_default();
-//   lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
-//                                             false, LV_FONT_DEFAULT);
-//   lv_disp_set_theme(dispp, theme);
-//   Pallete_screen_init();
-//   lv_disp_load_scr(ui_Screen1);
-// }
-
-
-// static void get_img_color(uint16_t x, uint16_t y){
-//     lv_color_t pixel_color = lv_img_buf_get_px_color(&ui_img_round_pallette_png, 50, 50,lv_color_make(0, 0, 0));
-//     uint32_t c32 = lv_color_to32(pixel_color);
-//     printf("Pixel color: %lu \n", c32);
-// }
