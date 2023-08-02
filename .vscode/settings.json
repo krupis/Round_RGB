@@ -13,5 +13,6 @@
     "idf.portWin": "COM16",
     "files.associations": {
         "*.tpp": "cpp"
-    }
+    },
+    "idf.flashType": "UART"
 }

@@ -16,43 +16,20 @@
 
 static const char *TAG = "T-RGB example";
 
+
+
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 2
 #define I2C_MASTER_PORT             I2C_NUM_0
-
-// we use two semaphores to sync the VSYNC event and the LVGL task, to avoid potential tearing effect
-#if CONFIG_EXAMPLE_AVOID_TEAR_EFFECT_WITH_SEM
-SemaphoreHandle_t sem_vsync_end;
-SemaphoreHandle_t sem_gui_ready;
-#endif
-
-// #define USING_2_1_INC_FT3267 1
 #define USING_2_1_INC_CST820 1
-// #define USING_2_8_INC_GT911 1
-
-#if !defined(USING_2_1_INC_CST820) && !defined(USING_2_8_INC_GT911) && !defined(USING_2_1_INC_FT3267)
-#error "Please define the size of the screen and open the macro definition at the top of the sketch"
-#endif
-
-#if defined(USING_2_1_INC_FT3267)
-#define TOUCH_MODULES_FT3267
-#elif defined(USING_2_1_INC_CST820)
 #define TOUCH_MODULES_CST_SELF
-#elif defined(USING_2_8_INC_GT911)
-#define TOUCH_MODULES_GT911
-#endif
 
 #include "TouchLib.h"
 
-#if defined(USING_2_1_INC_FT3267)
-#define TOUCH_SLAVE_ADDRESS FT3267_SLAVE_ADDRESS
-#elif defined(USING_2_1_INC_CST820)
+
 #define TOUCH_SLAVE_ADDRESS CST820_SLAVE_ADDRESS
-#elif defined(USING_2_8_INC_GT911)
-#define TOUCH_SLAVE_ADDRESS GT911_SLAVE_ADDRESS2
-//!  GT911 has prober need fix !
-//!  GT911 has prober need fix !
-//!  GT911 has prober need fix !
-#endif
+
+
+
 TouchLib touch;
 
 typedef struct {
@@ -61,7 +38,7 @@ typedef struct {
   uint8_t databytes; // No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
 
-#if defined(USING_2_1_INC_CST820) || defined(USING_2_1_INC_FT3267)
+
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     {0xFF, {0x77, 0x01, 0x00, 0x00, 0x10}, 0x05},
     {0xC0, {0x3b, 0x00}, 0x02},
@@ -106,53 +83,7 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     // {0xd2, {0x06}, 0x01},
     {0x29, {0x00}, 0x80},
     {0, {0}, 0xff}};
-#elif defined(USING_2_8_INC_GT911)
-DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
-    {0xFF, {0x77, 0x01, 0x00, 0x00, 0x13}, 0x05},
-    {0xEF, {0x08}, 0x01},
-    {0xFF, {0x77, 0x01, 0x00, 0x00, 0x10}, 0x05},
-    {0xC0, {0x3B, 0X00}, 0x02},
-    {0xC1, {0x10, 0x0C}, 0x02},
-    {0xC2, {0x07, 0x0A}, 0x02},
-    {0xC7, {0x00}, 0x01},
-    {0xCC, {0x10}, 0x01},
-    {0xCD, {0x08}, 0x01}, // 用565时屏蔽    666打开
-    {0xb0, {0x05, 0x12, 0x98, 0x0e, 0x0F, 0x07, 0x07, 0x09, 0x09, 0x23, 0x05, 0x52, 0x0F, 0x67, 0x2C, 0x11}, 0x10},
-    {0xb1, {0x0B, 0x11, 0x97, 0x0C, 0x12, 0x06, 0x06, 0x08, 0x08, 0x22, 0x03, 0x51, 0x11, 0x66, 0x2B, 0x0F}, 0x10},
-    {0xFF, {0x77, 0x01, 0x00, 0x00, 0x11}, 0x05},
-    {0xb0, {0x5d}, 0x01},
-    {0xb1, {0x2D}, 0x01},
-    {0xb2, {0x81}, 0x01},
-    {0xb3, {0x80}, 0x01},
-    {0xb5, {0x4E}, 0x01},
-    {0xb7, {0x85}, 0x01},
-    {0xb8, {0x20}, 0x01},
-    {0xc1, {0x78}, 0x01},
-    {0xc2, {0x78}, 0x01},
-    // {0xc3, {0x8c}, 0x01},
-    {0xd0, {0x88}, 0x01},
-    {0xe0, {0x00, 0x00, 0x02}, 0x03},
-    {0xe1, {0x06, 0x30, 0x08, 0x30, 0x05, 0x30, 0x07, 0x30, 0x00, 0x33, 0x33}, 0x0b},
-    {0xe2, {0x11, 0x11, 0x33, 0x33, 0xf4, 0x00, 0x00, 0x00, 0xf4, 0x00, 0x00, 0x00}, 0x0c},
-    {0xe3, {0x00, 0x00, 0x11, 0x11}, 0x04},
-    {0xe4, {0x44, 0x44}, 0x02},
-    {0xe5, {0x0d, 0xf5, 0x30, 0xf0, 0x0f, 0xf7, 0x30, 0xf0, 0x09, 0xf1, 0x30, 0xf0, 0x0b, 0xf3, 0x30, 0xf0}, 0x10},
-    {0xe6, {0x00, 0x00, 0x11, 0x11}, 0x04},
-    {0xe7, {0x44, 0x44}, 0x02},
-    {0xe8, {0x0c, 0xf4, 0x30, 0xf0, 0x0e, 0xf6, 0x30, 0xf0, 0x08, 0xf0, 0x30, 0xf0, 0x0a, 0xf2, 0x30, 0xf0}, 0x10},
-    {0xe9, {0x36}, 0x01},
-    {0xeb, {0x00, 0x01, 0xe4, 0xe4, 0x44, 0x88, 0x40}, 0x07},
-    {0xed, {0xff, 0x10, 0xaf, 0x76, 0x54, 0x2b, 0xcf, 0xff, 0xff, 0xfc, 0xb2, 0x45, 0x67, 0xfa, 0x01, 0xff}, 0x10},
-    {0xef, {0x08, 0x08, 0x08, 0x45, 0x3f, 0x54}, 0x06},
-    {0xFF, {0x77, 0x01, 0x00, 0x00, 0x00}, 0x05},
 
-    {0x11, {0x00}, 0x80},
-    {0x3a, {0x66}, 0x01},
-    {0x36, {0x08}, 0x01},
-    {0x35, {0x00}, 0x01},
-    {0x29, {0x00}, 0x80},
-    {0, {0}, 0xff}};
-#endif
 
 static void tft_init(void);
 
@@ -168,6 +99,7 @@ static int writeRegister(uint8_t devAddr, uint16_t regAddr, uint8_t *data, uint8
   i2c_master_write_to_device(I2C_MASTER_PORT, devAddr, write_buf, len + 1, 1000 / portTICK_PERIOD_MS);
   return 0;
 }
+
 
 // static void lv_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 
@@ -190,14 +122,16 @@ static bool example_on_vsync_event(esp_lcd_panel_handle_t panel, const esp_lcd_r
 }
 
 static void disp_flush(lv_disp_t *disp_drv, const lv_area_t *area, lv_color_t *px_map) {
-  printf("display flush \n");
-  LV_UNUSED(area);
-  LV_UNUSED(px_map);
+    printf("display flush \n");
+    esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_disp_get_user_data(disp_drv);
+    int offsetx1 = area->x1;
+    int offsetx2 = area->x2;
+    int offsety1 = area->y1;
+    int offsety2 = area->y2;
 
-  /*IMPORTANT!!!
-   *Inform the graphics library that you are ready with the flushing*/
-
-  lv_disp_flush_ready(disp_drv);
+    // pass the draw buffer to the driver
+    esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
+    lv_disp_flush_ready(disp_drv);
 }
 
 static void example_increase_lvgl_tick(void *arg) {
@@ -333,19 +267,18 @@ extern "C" void app_main(void) {
   lv_init();
   lv_disp_t *disp = lv_disp_create(EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES);
   lv_disp_set_flush_cb(disp, (lv_disp_flush_cb_t)(disp_flush));
-  // static lv_color_t buf_2_1[EXAMPLE_LCD_H_RES * 10];
-  // static lv_color_t buf_2_2[EXAMPLE_LCD_H_RES * 10];
-  // lv_disp_set_draw_buffers(disp, buf_2_1, buf_2_2, sizeof(buf_2_1), LV_DISP_RENDER_MODE_PARTIAL);
 
-  // static lv_color_t buf_3_1[EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES];
-  // static lv_color_t buf_3_2[EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES];
   void *buf1 = NULL;
   void *buf2 = NULL;
   buf1 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
   assert(buf1);
   buf2 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
   assert(buf2);
-  lv_disp_set_draw_buffers(disp, buf1, buf2, sizeof(buf1), LV_DISP_RENDER_MODE_DIRECT);
+
+  lv_disp_set_draw_buffers(disp, buf1, buf2,  (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t), LV_DISP_RENDER_MODE_FULL );
+
+
+
 
   ESP_LOGI(TAG, "Install LVGL tick timer");
   const esp_timer_create_args_t lvgl_tick_timer_args = {.callback = &example_increase_lvgl_tick, .name = "lvgl_tick"};
