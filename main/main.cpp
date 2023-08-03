@@ -29,6 +29,7 @@ static const char *TAG = "T-RGB example";
 #define TOUCH_SLAVE_ADDRESS CST820_SLAVE_ADDRESS
 
 
+static void touchpad_read(lv_indev_t * indev, lv_indev_data_t * data);
 
 TouchLib touch;
 
@@ -37,6 +38,8 @@ typedef struct {
   uint8_t data[16];
   uint8_t databytes; // No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
+
+
 
 
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
@@ -100,6 +103,19 @@ static int writeRegister(uint8_t devAddr, uint16_t regAddr, uint8_t *data, uint8
   return 0;
 }
 
+static void touchpad_read(lv_indev_t * indev_drv, lv_indev_data_t * data)
+{
+  if (touch.read()) {
+    printf("touch detected \n");
+    TP_Point t = touch.getPoint(0);
+    data->point.x = t.x;
+    data->point.y = t.y;
+    //get_img_color(t.x,t.y);
+    data->state = LV_INDEV_STATE_PR;
+  } else {
+    data->state = LV_INDEV_STATE_REL;
+  }
+}
 
 // static void lv_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 
@@ -266,8 +282,6 @@ extern "C" void app_main(void) {
   ESP_LOGI(TAG, "Initialize LVGL library");
   lv_init();
   lv_disp_t *disp = lv_disp_create(EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES);
-  lv_disp_set_flush_cb(disp, (lv_disp_flush_cb_t)(disp_flush));
-
   void *buf1 = NULL;
   void *buf2 = NULL;
   buf1 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
@@ -276,9 +290,15 @@ extern "C" void app_main(void) {
   assert(buf2);
 
   lv_disp_set_draw_buffers(disp, buf1, buf2,  (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t), LV_DISP_RENDER_MODE_FULL );
+  lv_disp_set_flush_cb(disp, (lv_disp_flush_cb_t)(disp_flush));
+  lv_disp_set_user_data(disp, panel_handle);
 
 
 
+  //touch
+  lv_indev_t * indev = lv_indev_create();
+  lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(indev, touchpad_read);
 
   ESP_LOGI(TAG, "Install LVGL tick timer");
   const esp_timer_create_args_t lvgl_tick_timer_args = {.callback = &example_increase_lvgl_tick, .name = "lvgl_tick"};
@@ -286,9 +306,35 @@ extern "C" void app_main(void) {
   ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
   ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000));
 
-  lv_obj_t *win = lv_win_create(lv_scr_act(), 40);
-  assert(win);
-  lv_win_add_title(win, "test123!");
+
+
+
+
+
+    lv_obj_set_flex_flow(lv_scr_act(), LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(lv_scr_act(), LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t * cb;
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_checkbox_set_text(cb, "Apple");
+    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
+
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_checkbox_set_text(cb, "Banana");
+    lv_obj_add_state(cb, LV_STATE_CHECKED);
+    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
+
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_checkbox_set_text(cb, "Lemon");
+    lv_obj_add_state(cb, LV_STATE_DISABLED);
+    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
+
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_obj_add_state(cb, LV_STATE_CHECKED | LV_STATE_DISABLED);
+    lv_checkbox_set_text(cb, "Melon\nand a new line");
+    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
+
+    lv_obj_update_layout(cb);
 
   while (1) {
     uint32_t task_delay_ms = lv_timer_handler();
