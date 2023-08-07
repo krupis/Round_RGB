@@ -16,11 +16,9 @@
 
 static const char *TAG = "T-RGB example";
 
-
-
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 2
 #define I2C_MASTER_PORT             I2C_NUM_0
-#define USING_2_1_INC_CST820 1
+#define USING_2_1_INC_CST820        1
 #define TOUCH_MODULES_CST_SELF
 
 #include "TouchLib.h"
@@ -28,8 +26,7 @@ static const char *TAG = "T-RGB example";
 
 #define TOUCH_SLAVE_ADDRESS CST820_SLAVE_ADDRESS
 
-
-static void touchpad_read(lv_indev_t * indev, lv_indev_data_t * data);
+static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data);
 
 TouchLib touch;
 
@@ -39,8 +36,12 @@ typedef struct {
   uint8_t databytes; // No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
 
-
-
+LV_IMG_DECLARE(round_pallette)
+LV_IMG_DECLARE(gradient_true)
+LV_IMG_DECLARE(gradient_24)
+LV_IMG_DECLARE(gradient_dithered)
+LV_IMG_DECLARE(color_wheel)
+LV_IMG_DECLARE(img_color_circle)
 
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     {0xFF, {0x77, 0x01, 0x00, 0x00, 0x10}, 0x05},
@@ -87,7 +88,6 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     {0x29, {0x00}, 0x80},
     {0, {0}, 0xff}};
 
-
 static void tft_init(void);
 
 static int readRegister(uint8_t devAddr, uint16_t regAddr, uint8_t *data, uint8_t len) {
@@ -103,33 +103,27 @@ static int writeRegister(uint8_t devAddr, uint16_t regAddr, uint8_t *data, uint8
   return 0;
 }
 
-static void touchpad_read(lv_indev_t * indev_drv, lv_indev_data_t * data)
-{
+static void touchpad_read(lv_indev_t *indev_drv, lv_indev_data_t *data) {
   if (touch.read()) {
     printf("touch detected \n");
     TP_Point t = touch.getPoint(0);
     data->point.x = t.x;
     data->point.y = t.y;
-    //get_img_color(t.x,t.y);
+    // get_img_color(t.x,t.y);
+
+    const lv_color32_t *c32 = (lv_color32_t *)img_color_circle.data;
+    c32 += t.y * img_color_circle.header.w + t.x;
+    printf("red = %u \n", c32->red);
+    printf("green = %u \n", c32->green);
+    printf("blue = %u \n", c32->blue);
+    // c32->red, c32->green, c32->blue
+
     data->state = LV_INDEV_STATE_PR;
   } else {
     data->state = LV_INDEV_STATE_REL;
   }
 }
 
-// static void lv_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
-
-//   if (touch.read()) {
-//     printf("touch detected \n");
-//     TP_Point t = touch.getPoint(0);
-//     data->point.x = t.x;
-//     data->point.y = t.y;
-//     //get_img_color(t.x,t.y);
-//     data->state = LV_INDEV_STATE_PR;
-//   } else {
-//     data->state = LV_INDEV_STATE_REL;
-//   }
-// }
 
 static bool example_on_vsync_event(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *event_data,
                                    void *user_data) {
@@ -138,16 +132,16 @@ static bool example_on_vsync_event(esp_lcd_panel_handle_t panel, const esp_lcd_r
 }
 
 static void disp_flush(lv_disp_t *disp_drv, const lv_area_t *area, lv_color_t *px_map) {
-    printf("display flush \n");
-    esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_disp_get_user_data(disp_drv);
-    int offsetx1 = area->x1;
-    int offsetx2 = area->x2;
-    int offsety1 = area->y1;
-    int offsety2 = area->y2;
+  printf("display flush \n");
+  esp_lcd_panel_handle_t panel_handle = (esp_lcd_panel_handle_t)lv_disp_get_user_data(disp_drv);
+  int offsetx1 = area->x1;
+  int offsetx2 = area->x2;
+  int offsety1 = area->y1;
+  int offsety2 = area->y2;
 
-    // pass the draw buffer to the driver
-    esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
-    lv_disp_flush_ready(disp_drv);
+  // pass the draw buffer to the driver
+  esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
+  lv_disp_flush_ready(disp_drv);
 }
 
 static void example_increase_lvgl_tick(void *arg) {
@@ -169,6 +163,10 @@ extern "C" void app_main(void) {
           },
   };
   esp_err_t err = i2c_param_config(I2C_MASTER_PORT, &conf);
+
+#if LV_COLOR_DEPTH == 24
+  printf("24 bit color depth\n");
+#endif
 
   if (err != ESP_OK) {
     ESP_LOGI(TAG, "i2c bus creation failed");
@@ -289,14 +287,13 @@ extern "C" void app_main(void) {
   buf2 = malloc((EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t));
   assert(buf2);
 
-  lv_disp_set_draw_buffers(disp, buf1, buf2,  (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t), LV_DISP_RENDER_MODE_FULL );
+  lv_disp_set_draw_buffers(disp, buf1, buf2, (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES) * sizeof(lv_color_t),
+                           LV_DISP_RENDER_MODE_FULL);
   lv_disp_set_flush_cb(disp, (lv_disp_flush_cb_t)(disp_flush));
   lv_disp_set_user_data(disp, panel_handle);
 
-
-
-  //touch
-  lv_indev_t * indev = lv_indev_create();
+  // touch
+  lv_indev_t *indev = lv_indev_create();
   lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(indev, touchpad_read);
 
@@ -306,35 +303,33 @@ extern "C" void app_main(void) {
   ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
   ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, EXAMPLE_LVGL_TICK_PERIOD_MS * 1000));
 
+  lv_obj_t *meter = lv_meter_create(lv_scr_act());
+
+  /*Remove the background and the circle from the middle*/
+  lv_obj_remove_style(meter, NULL, LV_PART_MAIN);
+  lv_obj_remove_style(meter, NULL, LV_PART_INDICATOR);
+
+  lv_obj_set_size(meter, 480, 480);
+  lv_obj_center(meter);
+
+  /*Add a scale first with no ticks.*/
+  lv_meter_set_scale_ticks(meter, 0, 0, 0, lv_color_black());
+  lv_meter_set_scale_range(meter, 0, 100, 360, 0);
+
+  /*Add a three arc indicator*/
+  lv_coord_t indic_w = 200;
 
 
+  lv_color_t test_color[20];
+  lv_meter_indicator_t *indic[20];
+  for (int i = 0; i < 20; i++) {
+    test_color[i] = lv_color_make(95, 124 + i, 95);
+    indic[i] = lv_meter_add_arc(meter, indic_w, test_color[i], 0);
+    lv_meter_set_indicator_start_value(meter, indic[i], 0+(5*i));
+    lv_meter_set_indicator_end_value(meter, indic[i], 5+(5*i));
+  }
 
 
-
-    lv_obj_set_flex_flow(lv_scr_act(), LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(lv_scr_act(), LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-
-    lv_obj_t * cb;
-    cb = lv_checkbox_create(lv_scr_act());
-    lv_checkbox_set_text(cb, "Apple");
-    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
-
-    cb = lv_checkbox_create(lv_scr_act());
-    lv_checkbox_set_text(cb, "Banana");
-    lv_obj_add_state(cb, LV_STATE_CHECKED);
-    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
-
-    cb = lv_checkbox_create(lv_scr_act());
-    lv_checkbox_set_text(cb, "Lemon");
-    lv_obj_add_state(cb, LV_STATE_DISABLED);
-    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
-
-    cb = lv_checkbox_create(lv_scr_act());
-    lv_obj_add_state(cb, LV_STATE_CHECKED | LV_STATE_DISABLED);
-    lv_checkbox_set_text(cb, "Melon\nand a new line");
-    //lv_obj_add_event_cb(cb, event_handler, LV_EVENT_ALL, NULL);
-
-    lv_obj_update_layout(cb);
 
   while (1) {
     uint32_t task_delay_ms = lv_timer_handler();
@@ -414,3 +409,4 @@ static void tft_init(void) {
     cmd++;
   }
 }
+
